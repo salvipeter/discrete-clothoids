@@ -4,9 +4,11 @@ import Graphics
 # Global variables
 points = []
 curve = []
-subsampling = 15
-iterations = 20
+subsampling = 25
+iterations = 100
 closed_curve = true
+
+distance(p, q) = norm(p - q)
 
 "Like `linspace` for arrays, but the last value is not included."
 function Base.linspace{T<:AbstractFloat}(start :: Array{T}, stop :: Array{T}, n)
@@ -20,7 +22,7 @@ end
 
 "The return value is the discrete curvature at the central point."
 function curvature(prev, p, next)
-    denom = norm(p - prev) * norm(next - p) * norm(next - prev)
+    denom = distance(prev, p) * distance(p, next) * distance(prev, next)
     2 * det(hcat(p - prev, next - p)) / denom
 end
 
@@ -40,23 +42,18 @@ end
 
 "Updates one point, given its neighbors and the target curvature."
 function update(prev, p, next, target)
-    # target *= norm(p - prev) * norm(next - p) * norm(next - prev) / 2.0
+    # Rearrange the equation
+    target *= distance(prev, p) * distance(p, next) * distance(prev, next) / 2.0
+    target += prev[1] * next[2] - prev[2] * next[1]
+    beta_x, beta_y = next[2] - prev[2], prev[1] - next[1]
+    # Now we need: x beta_x + y beta_y = target
     start = (next + prev) / 2
     dir = next - prev
     dir = [-dir[2], dir[1]]
-    # the result is of the form start + x * dir
-    # dumb search:
-    result = start
-    minerr = abs(curvature(prev, p, next) - target)
-    for x in -1:0.1:1
-        q = start + x * dir
-        err = abs(curvature(prev, q, next) - target)
-        if err < minerr
-            err = minerr
-            result = q
-        end
-    end
-    result
+    # [x,y] is of the form start + alpha * dir
+    target -= start[1] * beta_x + start[2] * beta_y
+    alpha = target / (dir[1] * beta_x + dir[2] * beta_y)
+    start + alpha * dir
 end
 
 """
@@ -162,7 +159,7 @@ end
 @guarded function mousedown_handler(canvas, event)
     p = [event.x, event.y]
     global clicked = findfirst(points) do q
-        norm(p - q) < 10
+        distance(p, q) < 10
     end
     if clicked == 0
         push!(points, p)
@@ -214,7 +211,7 @@ function setup_gui()
     push!(hbox, closedp)
 
     # Subsampling Spinbutton
-    sss = @SpinButton(5:5:30)
+    sss = @SpinButton(5:5:100)
     setproperty!(sss, :value, subsampling)
     signal_connect(sss, "value-changed") do sb
         global subsampling = getproperty(sb, :value, Int)
@@ -225,7 +222,7 @@ function setup_gui()
     push!(hbox, sss)
 
     # Iterations Spinbutton
-    its = @SpinButton(0:10:100)
+    its = @SpinButton(0:20:500)
     setproperty!(its, :value, iterations)
     signal_connect(its, "value-changed") do sb
         global iterations = getproperty(sb, :value, Int)
