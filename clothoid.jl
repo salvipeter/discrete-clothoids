@@ -4,8 +4,8 @@ import Graphics
 # Global variables
 points = []
 curve = []
-dilation = 5
-iterations = 3
+subsampling = 15
+iterations = 20
 closed_curve = true
 
 "Like `linspace` for arrays, but the last value is not included."
@@ -19,60 +19,96 @@ function Base.linspace{T<:AbstractFloat}(start :: Array{T}, stop :: Array{T}, n)
 end
 
 "The return value is the discrete curvature at the central point."
-function curvature(a, b, c)
-    denom = norm(b - a) * norm(c - b) * norm(c - a)
-    2 * det(hcat(b - a, c - b)) / denom
+function curvature(prev, p, next)
+    denom = norm(p - prev) * norm(next - p) * norm(next - prev)
+    2 * det(hcat(p - prev, next - p)) / denom
+end
+
+"Subsamples the given data by `subsampling`, cycling through if the second argument is `true`."
+function subsample(original, closedp)
+    result = []
+    for i in 2:length(original)
+        append!(result, linspace(original[i-1], original[i], subsampling))
+    end
+    if closedp
+        append!(result, linspace(original[end], original[1], subsampling))
+    else
+        push!(result, original[end])
+    end
+    result
+end
+
+"Updates one point, given its neighbors and the target curvature."
+function update(prev, p, next, target)
+    # target *= norm(p - prev) * norm(next - p) * norm(next - prev) / 2.0
+    start = (next + prev) / 2
+    dir = next - prev
+    dir = [-dir[2], dir[1]]
+    # the result is of the form start + x * dir
+    # dumb search:
+    result = start
+    minerr = abs(curvature(prev, p, next) - target)
+    for x in -1:0.1:1
+        q = start + x * dir
+        err = abs(curvature(prev, q, next) - target)
+        if err < minerr
+            err = minerr
+            result = q
+        end
+    end
+    result
 end
 
 """
 Discrete clothoid curve generation, as in R. Schneider, L. Kobbelt,
 _Discrete Fairing of Curves and Surfaces Based on Linear Curvature Distribution_,
-Defence Technical Information Center, 2000.
+In Curve and Surface Design: Saint Malo, pp. 371-380, University Press, 2000.
 
 Uses the indirect approach, with 0 curvature at the ends for open curves.
 """
 function generate_curve()
     # Generate initial curve points
-    global curve = []
-    for i in 2:length(points)
-        append!(curve, linspace(points[i-1], points[i], dilation))
-    end
-    if closed_curve
-        append!(curve, linspace(points[end], points[1], dilation))
-    end
+    global curve = subsample(points, closed_curve)
 
     if length(points) < 3
         return
     end
 
-    # Generate curvature values on the seed points
-    point_curv = []
-    if closed_curve
-        push!(point_curv, curvature(points[end],points[1],points[2]))
-    else
-        push!(point_curv, 0.0)
-    end
-    for i in 2:length(points)-1
-        push!(point_curv, curvature(points[i-1], points[i], points[i+1]))
-    end
-    if closed_curve
-        push!(point_curv, curvature(points[end-1],points[end],points[1]))
-    else
-        push!(point_curv, 0.0)
-    end
-
-    # Generate target curvature values on the curve
-    curve_curv = []
-    for i in 2:length(point_curv)
-        append!(curve_curv, linspace(point_curv[i-1], point_curv[i], dilation))
-    end
-    if closed_curve
-        append!(curve_curv, linspace(point_curv[end], point_curv[1], dilation))
-    end
-
     # Approximate clothoid curve
-    for i in 1:iterations
-        # TODO
+    for it in 1:iterations
+        # Generate curvature values at the seed points
+        point_curv = []
+        if closed_curve
+            push!(point_curv, curvature(curve[end], curve[1], curve[2]))
+        else
+            push!(point_curv, 0.0)
+        end
+        for i in 2:length(points)-1
+            j = 1 + (i-1) * subsampling
+            push!(point_curv, curvature(curve[j-1], curve[j], curve[j+1]))
+        end
+        if closed_curve
+            j = 1 + (length(points)-1) * subsampling
+            push!(point_curv, curvature(curve[j-1], curve[j], curve[j+1]))
+        else
+            push!(point_curv, 0.0)
+        end
+
+        # Generate target curvature values on the curve
+        curve_curv = subsample(point_curv, closed_curve)
+
+        # Update curve points
+        tmp = similar(curve)
+        for i in eachindex(curve)
+            if i % subsampling == 1
+                tmp[i] = curve[i]
+            elseif closed_curve && i == length(curve)
+                tmp[i] = update(curve[end-1], curve[end], curve[1], curve_curv[end])
+            else
+                tmp[i] = update(curve[i-1], curve[i], curve[i+1], curve_curv[i])
+            end
+        end
+        curve = tmp
     end
 end
 
@@ -110,7 +146,7 @@ end
     # Generated curve
     Graphics.set_source_rgb(ctx, 0, 0, 1)
     Graphics.set_line_width(ctx, 2.0)
-    draw_polygon(ctx, curve)
+    draw_polygon(ctx, curve, closed_curve)
 
     # Input points
     Graphics.set_source_rgb(ctx, 0, 0, 0)
@@ -177,19 +213,19 @@ function setup_gui()
     end
     push!(hbox, closedp)
 
-    # Dilation Spinbutton
-    dil = @SpinButton(5:5:30)
-    setproperty!(dil, :value, dilation)
-    signal_connect(dil, "value-changed") do sb
-        global dilation = getproperty(sb, :value, Int)
+    # Subsampling Spinbutton
+    sss = @SpinButton(5:5:30)
+    setproperty!(sss, :value, subsampling)
+    signal_connect(sss, "value-changed") do sb
+        global subsampling = getproperty(sb, :value, Int)
         generate_curve()
         draw(canvas)
     end
-    push!(hbox, @Label("Dilation:"))
-    push!(hbox, dil)
+    push!(hbox, @Label("Subsampling:"))
+    push!(hbox, sss)
 
     # Iterations Spinbutton
-    its = @SpinButton(0:10)
+    its = @SpinButton(0:10:100)
     setproperty!(its, :value, iterations)
     signal_connect(its, "value-changed") do sb
         global iterations = getproperty(sb, :value, Int)
