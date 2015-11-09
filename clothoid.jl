@@ -1,14 +1,24 @@
 using Gtk.ShortNames
 import Graphics
 
+# Parameters
+curvature_scaling = 5000
+
 # Global variables
 points = []
 curve = []
+curvature_comb = []
 subsampling = 25
 iterations = 100
-closed_curve = true
+closed_curve = false
 
 distance(p, q) = norm(p - q)
+
+function perp2d(p)
+    u = [-p[2], p[1]]
+    unorm = norm(u)
+    unorm > 0 ? u / unorm : u
+end
 
 "Like `linspace` for arrays, but the last value is not included."
 function Base.linspace{T<:AbstractFloat}(start :: Array{T}, stop :: Array{T}, n)
@@ -48,8 +58,7 @@ function update(prev, p, next, target)
     beta_x, beta_y = next[2] - prev[2], prev[1] - next[1]
     # Now we need: x beta_x + y beta_y = target
     start = (next + prev) / 2
-    dir = next - prev
-    dir = [-dir[2], dir[1]]
+    dir = perp2d(next - prev)
     # [x,y] is of the form start + alpha * dir
     target -= start[1] * beta_x + start[2] * beta_y
     alpha = target / (dir[1] * beta_x + dir[2] * beta_y)
@@ -107,6 +116,20 @@ function generate_curve()
         end
         curve = tmp
     end
+
+    # Generate curvature comb
+    normals = similar(curve)
+    for i in eachindex(curve)
+        if i == 1
+            normals[1] = perp2d(curve[2] - curve[1])
+        elseif i == length(curve)
+            normals[end] = perp2d(curve[end] - curve[end-1])
+        else
+            normals[i] = perp2d(curve[i+1] - curve[i-1])
+        end
+    end
+    local curve_curv
+    global curvature_comb = normals .* curve_curv * curvature_scaling
 end
 
 
@@ -144,6 +167,18 @@ end
     Graphics.set_source_rgb(ctx, 0, 0, 1)
     Graphics.set_line_width(ctx, 2.0)
     draw_polygon(ctx, curve, closed_curve)
+
+    # Approximate curvature comb
+    if length(points) > 2
+        Graphics.set_source_rgb(ctx, 0, 1, 0)
+        Graphics.set_line_width(ctx, 1.0)
+        Graphics.new_path(ctx)
+        for i in eachindex(curve)
+            Graphics.move_to(ctx, curve[i][1], curve[i][2])
+            Graphics.rel_line_to(ctx, curvature_comb[i][1], curvature_comb[i][2])
+        end
+        Graphics.stroke(ctx)
+    end
 
     # Input points
     Graphics.set_source_rgb(ctx, 0, 0, 0)
@@ -191,8 +226,7 @@ function setup_gui()
     # Reset button
     reset = @Button("Start Over")
     signal_connect(reset, "clicked") do _
-        global points = []
-        generate_curve()
+        global points = [], curve = []
         draw(canvas)
     end
     hbox = @Box(:h)
