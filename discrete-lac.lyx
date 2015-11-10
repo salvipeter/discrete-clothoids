@@ -1,0 +1,825 @@
+#LyX 2.0 created this file. For more info see http://www.lyx.org/
+\lyxformat 413
+\begin_document
+\begin_header
+\textclass article
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman default
+\font_sans default
+\font_typewriter default
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_amsmath 1
+\use_esint 1
+\use_mhchem 1
+\use_mathdots 1
+\cite_engine basic
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\use_refstyle 1
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Discrete Log-Aesthetic Curves
+\end_layout
+
+\begin_layout Author
+Peter Salvi
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+
+\size small
+Shizuoka University
+\end_layout
+
+\begin_layout Section
+Discrete Clothoid Spline
+\end_layout
+
+\begin_layout Standard
+Clothoids (also called Cornu or Euler spirals) are 2D curves with curvature
+ depending linearly on arc length:
+\begin_inset Formula 
+\begin{equation}
+\kappa(s)=as+b,
+\end{equation}
+
+\end_inset
+
+where 
+\begin_inset Formula $a$
+\end_inset
+
+ and 
+\begin_inset Formula $b$
+\end_inset
+
+ are scalar constants.
+ A clothoid spline is a series of clothoid arcs, with matching curvature
+ at the knots (
+\begin_inset Formula $G^{2}$
+\end_inset
+
+ continuity).
+\end_layout
+
+\begin_layout Standard
+Schneider and Kobbelt 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "discrete-clothoid"
+
+\end_inset
+
+ give a simple iterative algorithm for interpolating an ordered set of points
+ with a discrete variation of the clothoid spline.
+ It consists of the following steps:
+\end_layout
+
+\begin_layout Enumerate
+Subsample the input polygon to create a dense set of points 
+\begin_inset Formula $\{Q_{i}^{0}\}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Enumerate
+Compute the discrete curvature at the input points.
+ The discrete curvature at point 
+\begin_inset Formula $Q_{i}^{k}$
+\end_inset
+
+ depends also on the two adjacent points:
+\begin_inset Formula 
+\begin{equation}
+\kappa_{i}=2\frac{\det(Q_{i}^{k}-Q_{i-1}^{k},Q_{i+1}^{k}-Q_{i}^{k})}{\left\Vert Q_{i}^{k}-Q_{i-1}^{k}\right\Vert \left\Vert Q_{i+1}^{k}-Q_{i}^{k}\right\Vert \left\Vert Q_{i+1}^{k}-Q_{i-1}^{k}\right\Vert }.\label{eq:curvature}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Enumerate
+Assign target curvature values 
+\begin_inset Formula $\tilde{\kappa}_{i}$
+\end_inset
+
+ to all points using linear interpolation between the input points.
+\end_layout
+
+\begin_layout Enumerate
+For every non-input point, independently compute a new position 
+\begin_inset Formula $Q_{i}^{k+1}$
+\end_inset
+
+, such that (i) the curvature at the new position equals the one computed
+ in step 2, and (ii) the segments become arc length parameterized.
+ The discrete equation for arc length parameterization is
+\begin_inset Formula 
+\begin{equation}
+\left\Vert Q_{i}^{k+1}-Q_{i-1}^{k}\right\Vert =\left\Vert Q_{i+1}^{k}-Q_{i}^{k+1}\right\Vert .\label{eq:arc-length}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Enumerate
+Go back to step 2, unless all movement was within tolerance, or the number
+ of iterations exceeded a given maximum.
+\end_layout
+
+\begin_layout Standard
+The heart of the algorithm is step 4, which deserves a bit more detail.
+ Calculating the curvature by Eq.
+\begin_inset space ~
+\end_inset
+
+(
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "eq:curvature"
+
+\end_inset
+
+) using 
+\begin_inset Formula $Q_{i-1}^{k}$
+\end_inset
+
+, 
+\begin_inset Formula $Q_{i}^{k+1}$
+\end_inset
+
+, and 
+\begin_inset Formula $Q_{i+1}^{k}$
+\end_inset
+
+ is not linear in 
+\begin_inset Formula $Q_{i}^{k+1}$
+\end_inset
+
+, but we can use its old value 
+\begin_inset Formula $Q_{i}^{k}$
+\end_inset
+
+ in the denominator, as movements are assumed to be relatively small.
+ Thus the equation becomes
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula 
+\begin{equation}
+2\frac{\det(Q_{i}^{k+1}-Q_{i-1}^{k},Q_{i+1}^{k}-Q_{i}^{k+1})}{\left\Vert Q_{i}^{k}-Q_{i-1}^{k}\right\Vert \left\Vert Q_{i+1}^{k}-Q_{i}^{k}\right\Vert \left\Vert Q_{i+1}^{k}-Q_{i-1}^{k}\right\Vert }=\tilde{\kappa}_{i},\label{eq:curvature-update}
+\end{equation}
+
+\end_inset
+
+where the determinant is
+\begin_inset Formula 
+\begin{equation}
+x_{i}^{k+1}(y_{i+1}^{k}-y_{i-1}^{k})+y_{i}^{k+1}(x_{i-1}^{k}-x_{i+1}^{k})+y_{i-1}x_{i+1}-x_{i-1}y_{i+1},
+\end{equation}
+
+\end_inset
+
+so Eq
+\family default
+\series default
+\shape default
+\size default
+\emph default
+\bar default
+\strikeout default
+\uuline default
+\uwave default
+\noun default
+\color inherit
+.
+\begin_inset space ~
+\end_inset
+
+(
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "eq:curvature-update"
+
+\end_inset
+
+) can be written in the form
+\begin_inset Formula 
+\begin{equation}
+x_{i}^{k+1}(y_{i+1}^{k}-y_{i-1}^{k})+y_{i}^{k+1}(x_{i-1}^{k}-x_{i+1}^{k})=c.\label{eq:curvature-simple}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Also, from 
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+Eq.
+\family default
+\series default
+\shape default
+\size default
+\emph default
+\bar default
+\strikeout default
+\uuline default
+\uwave default
+\noun default
+\color inherit
+.
+\begin_inset space ~
+\end_inset
+
+(
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "eq:arc-length"
+
+\end_inset
+
+) we know that 
+\begin_inset Formula $Q_{i}^{k+1}$
+\end_inset
+
+ is on the perpendicular bisector of 
+\begin_inset Formula $Q_{i-1}^{k}$
+\end_inset
+
+ and 
+\begin_inset Formula $Q_{i+1}^{k}$
+\end_inset
+
+, so it can be written as
+\begin_inset Formula 
+\begin{equation}
+Q_{i}^{k+1}=\frac{1}{2}(Q_{i-1}^{k}+Q_{i+1}^{k})+\beta_{i}(Q_{i+1}^{k}-Q_{i-1}^{k})^{\perp},
+\end{equation}
+
+\end_inset
+
+which, combined with 
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+Eq.
+\family default
+\series default
+\shape default
+\size default
+\emph default
+\bar default
+\strikeout default
+\uuline default
+\uwave default
+\noun default
+\color inherit
+.
+\begin_inset space ~
+\end_inset
+
+(
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "eq:curvature-simple"
+
+\end_inset
+
+), leads to an explicit formula for 
+\begin_inset Formula $Q_{i}^{k+1}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+The above algorithm is defined for closed curves.
+ For open curves, curvature values at the endpoints need to be supplied,
+ but otherwise the algorithm stays the same.
+ Figure
+\begin_inset space ~
+\end_inset
+
+
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:Discrete-clothoids"
+
+\end_inset
+
+ shows an example for both cases.
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename images/closed-input.png
+	display false
+	width 30text%
+
+\end_inset
+
+
+\begin_inset space \hfill{}
+\end_inset
+
+
+\begin_inset Graphics
+	filename images/closed-curve.png
+	display false
+	width 30text%
+
+\end_inset
+
+
+\begin_inset space \hfill{}
+\end_inset
+
+
+\begin_inset Graphics
+	filename images/closed-dense.png
+	display false
+	width 30text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename images/open-input.png
+	display false
+	width 30text%
+
+\end_inset
+
+
+\begin_inset space \hfill{}
+\end_inset
+
+
+\begin_inset Graphics
+	filename images/open-curve.png
+	display false
+	width 30text%
+
+\end_inset
+
+
+\begin_inset space \hfill{}
+\end_inset
+
+
+\begin_inset Graphics
+	filename images/open-dense.png
+	display false
+	width 30text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Discrete-clothoids"
+
+\end_inset
+
+Discrete clothoids with curvature comb: subsampled input (
+\emph on
+left
+\emph default
+), result curve (
+\emph on
+middle
+\emph default
+), dense sampling (
+\emph on
+right
+\emph default
+).
+ The open curve is generated with 0 curvature at the ends.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Discrete LA Curves
+\end_layout
+
+\begin_layout Standard
+A generalization of the clothoid arc is the log-aesthetic curve (LAC, 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "aesthetic-review"
+
+\end_inset
+
+), having the property
+\begin_inset Formula 
+\begin{equation}
+\kappa(s)^{-\alpha}=as+b.
+\end{equation}
+
+\end_inset
+
+This class of curves includes the clothoid (
+\begin_inset Formula $\alpha=-1$
+\end_inset
+
+) and also the logarithmic spiral (
+\begin_inset Formula $\alpha=1$
+\end_inset
+
+), but 
+\begin_inset Formula $\alpha>0$
+\end_inset
+
+ leads to problems when some curvature values vanish.
+\end_layout
+
+\begin_layout Standard
+The algorithm in the previous section can easily be extended to work for
+ LA curves.
+ We only need to change how target curvatures are computed.
+ For a point 
+\begin_inset Formula $Q_{i}^{k+1}$
+\end_inset
+
+ between the adjacent seed points 
+\begin_inset Formula $Q_{\mathrm{prev}}^{k}$
+\end_inset
+
+ and 
+\begin_inset Formula $Q_{\mathrm{next}}^{k}$
+\end_inset
+
+, we can compute the target curvature as
+\begin_inset Formula 
+\[
+\tilde{\kappa}_{i}=\left[\kappa_{\mathrm{prev}}^{-\alpha}\frac{\mathrm{next}-i}{\mathrm{next}-\mathrm{prev}}+\kappa_{\mathrm{next}}^{-\alpha}\frac{i-\mathrm{prev}}{\mathrm{next}-\mathrm{prev}}\right]^{-1/\alpha},
+\]
+
+\end_inset
+
+where 
+\begin_inset Formula $\kappa^{-\alpha}:=\mathrm{sgn}(\kappa)\cdot|\kappa|^{-\alpha}.$
+\end_inset
+
+ Figure
+\begin_inset space ~
+\end_inset
+
+
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:Discrete-LAC"
+
+\end_inset
+
+ shows an example.
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename images/lac10.png
+	display false
+	width 40text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset Formula $\alpha=-1$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset space \hfill{}
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename images/lac08.png
+	display false
+	width 40text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset Formula $\alpha=-0.8$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename images/lac05.png
+	display false
+	width 40text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset Formula $\alpha=-0.5$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset space \hfill{}
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename images/lac02.png
+	display false
+	width 40text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset Formula $\alpha=-0.2$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Discrete-LAC"
+
+\end_inset
+
+Discrete LA-curves.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "discrete-clothoid"
+
+\end_inset
+
+R.
+\begin_inset space ~
+\end_inset
+
+Schneider, L.
+\begin_inset space ~
+\end_inset
+
+Kobbelt, 
+\emph on
+Discrete Fairing of Curves and Surfaces Based on Linear Curvature Distribution
+\emph default
+.
+ In Curve and Surface Design: Saint Malo, pp.
+\begin_inset space ~
+\end_inset
+
+371--380, University Press, 2000.
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "aesthetic-review"
+
+\end_inset
+
+K.
+\begin_inset space ~
+\end_inset
+
+T.
+\begin_inset space ~
+\end_inset
+
+Miura, R.
+\begin_inset space ~
+\end_inset
+
+U.
+\begin_inset space ~
+\end_inset
+
+Gobithaasan, 
+\emph on
+Aesthetic Curves and Surfaces in Computer-Aided Geometric Design
+\emph default
+.
+ In: International Journal of Automation Technology, Vol.
+\begin_inset space ~
+\end_inset
+
+8(3), pp.
+\begin_inset space ~
+\end_inset
+
+304--316, 2014.
+\end_layout
+
+\end_body
+\end_document
