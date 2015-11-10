@@ -11,6 +11,7 @@ curvature_comb = []
 subsampling = 25
 iterations = 100
 closed_curve = false
+alpha = -1.0
 
 distance(p, q) = norm(p - q)
 
@@ -20,9 +21,9 @@ function perp2d(p)
     unorm > 0 ? u / unorm : u
 end
 
-"Like `linspace` for arrays, but the last value is not included."
-function Base.linspace{T<:AbstractFloat}(start :: Array{T}, stop :: Array{T}, n)
-    a = Array(Array{T}, n)
+"Like `linspace`, but the last value is not included."
+function linspace_nolast(start, stop, n)
+    a = Vector(n)
     for i = 0:(n-1)
         alpha = i / n
         a[i+1] = start * (1 - alpha) + stop * alpha
@@ -38,16 +39,33 @@ end
 
 "Subsamples the given data by `subsampling`, cycling through if the second argument is `true`."
 function subsample(original, closedp)
+    if isempty(original)
+        return []
+    end
     result = []
     for i in 2:length(original)
-        append!(result, linspace(original[i-1], original[i], subsampling))
+        append!(result, linspace_nolast(original[i-1], original[i], subsampling))
     end
     if closedp
-        append!(result, linspace(original[end], original[1], subsampling))
+        append!(result, linspace_nolast(original[end], original[1], subsampling))
     else
         push!(result, original[end])
     end
     result
+end
+
+function subsample_alpha(original, closedp)
+    original = map(x -> sign(x)*abs(x)^(-alpha), original)
+    result = []
+    for i in 2:length(original)
+        append!(result, linspace_nolast(original[i-1], original[i], subsampling))
+    end
+    if closedp
+        append!(result, linspace_nolast(original[end], original[1], subsampling))
+    else
+        push!(result, original[end])
+    end
+    map(x -> sign(x)*abs(x)^(-1/alpha), result)
 end
 
 "Updates one point, given its neighbors and the target curvature."
@@ -102,7 +120,7 @@ function generate_curve()
         end
 
         # Generate target curvature values on the curve
-        curve_curv = subsample(point_curv, closed_curve)
+        curve_curv = subsample_alpha(point_curv, closed_curve)
 
         # Update curve points
         tmp = similar(curve)
@@ -283,6 +301,23 @@ function setup_gui()
     end
     push!(hbox, @Label("# of iterations:"))
     push!(hbox, its)
+
+    # Alpha Choices
+    hbox = @Box(:h)
+    push!(vbox, hbox)
+    push!(hbox, @Label("Alpha: "))
+    choices = [-1.0, -0.8, -0.5, -0.2, 0.2, 0.5, 0.8, 1.0]
+    radios = [@RadioButton(string(choice)) for choice in choices]
+    setproperty!(radios[1], :active, true)
+    for r in radios
+        setproperty!(r, :group, radios[1])
+        signal_connect(r, "toggled") do rb
+            global alpha = choices[findfirst(radios, rb)]
+            generate_curve()
+            draw(canvas)
+        end
+        push!(hbox, r)
+    end
 
     showall(win)
 end
