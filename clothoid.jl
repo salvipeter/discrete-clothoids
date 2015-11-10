@@ -183,6 +183,14 @@ end
         Graphics.stroke(ctx)
     end
 
+    if subsampling <= 10
+        Graphics.set_source_rgb(ctx, 0.4, 0.4, 0.4)
+        for p in curve
+            Graphics.arc(ctx, p[1], p[2], 3, 0, 2pi)
+            Graphics.fill(ctx)
+        end
+    end
+
     # Input points
     Graphics.set_source_rgb(ctx, 0, 0, 0)
     for p in points[2:end-1]
