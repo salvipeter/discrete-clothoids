@@ -81,6 +81,7 @@ function generate_curve()
     end
 
     # Approximate clothoid curve
+    local curve_curv = []
     for it in 1:iterations
         # Generate curvature values at the seed points
         point_curv = []
@@ -128,7 +129,9 @@ function generate_curve()
             normals[i] = perp2d(curve[i+1] - curve[i-1])
         end
     end
-    local curve_curv
+    if isempty(curve_curv)
+        curve_curv = zeros(length(curve))
+    end
     global curvature_comb = normals .* curve_curv * curvature_scaling
 end
 
