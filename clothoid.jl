@@ -185,9 +185,16 @@ end
 
     # Input points
     Graphics.set_source_rgb(ctx, 0, 0, 0)
-    for p in points
+    for p in points[2:end-1]
         Graphics.arc(ctx, p[1], p[2], 5, 0, 2pi)
         Graphics.fill(ctx)
+    end
+    if !isempty(points)
+        Graphics.set_source_rgb(ctx, 0, 0.8, 0.8)
+        for p in (points[1], points[end])
+            Graphics.arc(ctx, p[1], p[2], 5, 0, 2pi)
+            Graphics.fill(ctx)
+        end
     end
 end
 
