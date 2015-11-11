@@ -3,6 +3,7 @@ import Graphics
 
 # Parameters
 curvature_scaling = 5000
+tangent_length = 80
 
 # Global variables
 points = []
@@ -207,6 +208,24 @@ end
             Graphics.arc(ctx, p[1], p[2], 3, 0, 2pi)
             Graphics.fill(ctx)
         end
+    end
+
+    # Approximated tangents (does not account for non-equidistant sampling)
+    Graphics.set_source_rgb(ctx, 1, 0, 1)
+    Graphics.set_line_width(ctx, 1.0)
+    for i in 2:length(points)-1
+        j = 1 + (i-1) * subsampling
+        dir = curve[j-1] - curve[j+1]
+        len = norm(dir)
+        if len > 0
+            dir /= len
+        end
+        p1 = points[i] - dir * tangent_length / 2
+        p2 = points[i] + dir * tangent_length / 2
+        Graphics.new_path(ctx)
+        Graphics.move_to(ctx, p1[1], p1[2])
+        Graphics.line_to(ctx, p2[1], p2[2])
+        Graphics.stroke(ctx)
     end
 
     # Input points
