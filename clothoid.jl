@@ -5,14 +5,16 @@ import Graphics
 curvature_scaling = 5000
 tangent_length = 80
 
+# GUI parameters
+closed_curve = false
+subsampling = 25
+iterations = 100
+alpha = -1.0
+
 # Global variables
 points = []
 curve = []
 curvature_comb = []
-subsampling = 25
-iterations = 100
-closed_curve = false
-alpha = -1.0
 
 distance(p, q) = norm(p - q)
 
@@ -38,11 +40,17 @@ function curvature(prev, p, next)
     2 * det(hcat(p - prev, next - p)) / denom
 end
 
-"Subsamples the given data by `subsampling`, cycling through if the second argument is `true`."
-function subsample(original, closedp)
+"""
+Subsamples the given data by `subsampling`, cycling through if the second argument is `true`.
+When the third argument is true, sampling uses alpha exponent instead of linear interpolation.
+"""
+function subsample(original, closedp, use_alpha_p = false)
     if isempty(original)
         return []
     end
+    if use_alpha_p
+        original = map(x -> sign(x)*abs(x)^(-alpha), original)
+    end
     result = []
     for i in 2:length(original)
         append!(result, linspace_nolast(original[i-1], original[i], subsampling))
@@ -52,21 +60,7 @@ function subsample(original, closedp)
     else
         push!(result, original[end])
     end
-    result
-end
-
-function subsample_alpha(original, closedp)
-    original = map(x -> sign(x)*abs(x)^(-alpha), original)
-    result = []
-    for i in 2:length(original)
-        append!(result, linspace_nolast(original[i-1], original[i], subsampling))
-    end
-    if closedp
-        append!(result, linspace_nolast(original[end], original[1], subsampling))
-    else
-        push!(result, original[end])
-    end
-    map(x -> sign(x)*abs(x)^(-1/alpha), result)
+    use_alpha_p ? map(x -> sign(x)*abs(x)^(-1/alpha), result) : result
 end
 
 "Updates one point, given its neighbors and the target curvature."
@@ -100,7 +94,7 @@ function generate_curve()
     end
 
     # Approximate clothoid curve
-    local curve_curv = []
+    curve_curv = []
     for it in 1:iterations
         # Generate curvature values at the seed points
         point_curv = []
@@ -121,7 +115,7 @@ function generate_curve()
         end
 
         # Generate target curvature values on the curve
-        curve_curv = subsample_alpha(point_curv, closed_curve)
+        curve_curv = subsample(point_curv, closed_curve, true)
 
         # Update curve points
         tmp = similar(curve)
