@@ -1,5 +1,8 @@
-using Gtk.ShortNames
+module Clothoid
+
+using Gtk
 import Graphics
+using LinearAlgebra
 
 # Parameters
 curvature_scaling = 5000
@@ -25,14 +28,7 @@ function perp2d(p)
 end
 
 "Like `linspace`, but the last value is not included."
-function linspace_nolast(start, stop, n)
-    a = Vector(n)
-    for i = 0:(n-1)
-        alpha = i / n
-        a[i+1] = start * (1 - alpha) + stop * alpha
-    end
-    a
-end
+linspace_nolast(start, stop, n) = collect(range(start, stop=stop, length=n+1))[1:n]
 
 "The return value is the discrete curvature at the central point."
 function curvature(prev, p, next)
@@ -166,7 +162,7 @@ function draw_polygon(ctx, poly, closep = false)
     Graphics.stroke(ctx)
 end
 
-@guarded function draw_callback(canvas)
+draw_callback = @guarded (canvas) -> begin
     ctx = Graphics.getgc(canvas)
 
     # White background
@@ -240,12 +236,12 @@ end
 
 # GUI
 
-@guarded function mousedown_handler(canvas, event)
+mousedown_handler = @guarded (canvas, event) -> begin
     p = [event.x, event.y]
     global clicked = findfirst(points) do q
         distance(p, q) < 10
     end
-    if clicked == 0
+    if clicked === nothing
         push!(points, p)
         clicked = length(points)
         generate_curve()
@@ -253,7 +249,7 @@ end
     end
 end
 
-@guarded function mousemove_handler(canvas, event)
+mousemove_handler = @guarded (canvas, event) -> begin
     global clicked
     points[clicked] = [event.x, event.y]
     generate_curve()
@@ -261,11 +257,11 @@ end
 end
 
 function setup_gui()
-    win = @Window("Discrete Clothoid")
-    vbox = @Box(:v)
+    win = GtkWindow("Discrete Clothoid")
+    vbox = GtkBox(:v)
 
     # Canvas widget
-    canvas = @Canvas(500, 500)
+    canvas = GtkCanvas(500, 500)
     canvas.mouse.button1press = mousedown_handler
     canvas.mouse.button1motion = mousemove_handler
     draw(draw_callback, canvas)
@@ -273,57 +269,58 @@ function setup_gui()
     push!(vbox, canvas)
 
     # Reset button
-    reset = @Button("Start Over")
+    reset = GtkButton("Start Over")
     signal_connect(reset, "clicked") do _
-        global points = [], curve = []
+        global points = []
+        global curve = []
         draw(canvas)
     end
-    hbox = @Box(:h)
-    setproperty!(hbox, :spacing, 10)
+    hbox = GtkBox(:h)
+    set_gtk_property!(hbox, :spacing, 10)
     push!(vbox, hbox)
     push!(hbox, reset)
 
     # Closed Checkbox
-    closedp = @CheckButton("Closed curve")
-    setproperty!(closedp, :active, closed_curve)
+    closedp = GtkCheckButton("Closed curve")
+    set_gtk_property!(closedp, :active, closed_curve)
     signal_connect(closedp, "toggled") do cb
-        global closed_curve = getproperty(cb, :active, Bool)
+        global closed_curve = get_gtk_property(cb, :active, Bool)
         generate_curve()
         draw(canvas)
     end
     push!(hbox, closedp)
 
     # Subsampling Spinbutton
-    sss = @SpinButton(5:5:100)
-    setproperty!(sss, :value, subsampling)
+    sss = GtkSpinButton(5:5:100)
+    set_gtk_property!(sss, :value, subsampling)
     signal_connect(sss, "value-changed") do sb
-        global subsampling = getproperty(sb, :value, Int)
+        global subsampling = get_gtk_property(sb, :value, Int)
         generate_curve()
         draw(canvas)
     end
-    push!(hbox, @Label("Subsampling:"))
+    push!(hbox, GtkLabel("Subsampling:"))
     push!(hbox, sss)
 
     # Iterations Spinbutton
-    its = @SpinButton(0:20:500)
-    setproperty!(its, :value, iterations)
+    its = GtkSpinButton(0:20:500)
+    set_gtk_property!(its, :value, iterations)
     signal_connect(its, "value-changed") do sb
-        global iterations = getproperty(sb, :value, Int)
+        global iterations = get_gtk_property(sb, :value, Int)
         generate_curve()
         draw(canvas)
     end
-    push!(hbox, @Label("# of iterations:"))
+    push!(hbox, GtkLabel("# of iterations:"))
     push!(hbox, its)
 
     # Alpha Choices
-    hbox = @Box(:h)
+    hbox = GtkBox(:h)
     push!(vbox, hbox)
-    push!(hbox, @Label("Alpha: "))
+    push!(hbox, GtkLabel("Alpha: "))
     choices = [-1.0, -0.8, -0.5, -0.2, 0.2, 0.5, 0.8, 1.0]
-    radios = [@RadioButton(string(choice)) for choice in choices]
-    setproperty!(radios[1], :active, true)
+    radios = [GtkRadioButton(string(choice)) for choice in choices]
+    set_gtk_property!(radios[1], :active, true)
     for r in radios
-        setproperty!(r, :group, radios[1])
+        set_gtk_property!(r, :group, radios[1])
         signal_connect(r, "toggled") do rb
             global alpha = choices[findfirst(radios, rb)]
             generate_curve()
@@ -335,4 +332,6 @@ function setup_gui()
     showall(win)
 end
 
-setup_gui()
+run() = setup_gui()
+
+end # module
