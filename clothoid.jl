@@ -321,8 +321,8 @@ function setup_gui()
     set_gtk_property!(radios[1], :active, true)
     for r in radios
         set_gtk_property!(r, :group, radios[1])
-        signal_connect(r, "toggled") do rb
-            global alpha = choices[findfirst(radios, rb)]
+        signal_connect(r, "toggled") do _
+            global alpha = choices[findfirst(rb -> rb === r, radios)]
             generate_curve()
             draw(canvas)
         end
@@ -332,6 +332,6 @@ function setup_gui()
     showall(win)
 end
 
-run() = setup_gui()
+run() = begin setup_gui(); nothing end
 
 end # module
