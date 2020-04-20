@@ -22,6 +22,7 @@ int main(int argc, char **argv) {
   const auto &polyline = fitter.polyline();
   std::ofstream f("polyline.txt");
   std::copy(polyline.begin(), polyline.end(), std::ostream_iterator<Point2D>(f, "\n"));
+  f << polyline.front() << std::endl; // closed polyline
   f.close();
 
   double scaling = 20;
@@ -35,6 +36,7 @@ int main(int argc, char **argv) {
     f << p - t * scaling << std::endl;
     f << p << std::endl;
   }
+  f.close();
 
   // Display the result with GNUPlot
   std::system("gnuplot lac-test.p");
