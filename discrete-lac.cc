@@ -87,7 +87,7 @@ void DiscreteLAC::fit() {
   avg_distance_ = 0;
   DoubleVector distances;
   for (size_t i = 1; i < n; ++i) {
-    distances.push_back((input_[i] - input_[0]).norm());
+    distances.push_back((input_[i] - input_[i-1]).norm());
     avg_distance_ += distances.back();
   }
   if (closed_) {
@@ -105,7 +105,7 @@ void DiscreteLAC::fit() {
   for (size_t i = 1; i < n; ++i) {
     size_t resolution = std::round(distances[i-1] * density);
     for (size_t j = 1; j < resolution; ++j) {
-      size_t u = (double)j / resolution;
+      double u = (double)j / resolution;
       polyline_.push_back(input_[i-1] * (1 - u) + input_[i] * u);
     }
     input_indices_.push_back(polyline_.size());
@@ -114,7 +114,7 @@ void DiscreteLAC::fit() {
   if (closed_) {
     size_t resolution = std::round(distances.back() * density);
     for (size_t j = 1; j < resolution; ++j) {
-      size_t u = (double)j / resolution;
+      double u = (double)j / resolution;
       polyline_.push_back(input_.back() * (1 - u) + input_.front() * u);
     }
   }
@@ -154,7 +154,7 @@ void DiscreteLAC::fit() {
       size_t resolution = to - from;
       for (size_t j = 1; j < resolution; ++j) {
         double u = (double)j / resolution;
-        curvature[from+j] = curvature[from] * (1 - u) + curvature[to];
+        curvature[from+j] = curvature[from] * (1 - u) + curvature[to] * u;
       }
     }
     if (closed_) {
@@ -162,7 +162,7 @@ void DiscreteLAC::fit() {
       size_t resolution = curvature.size() - from;
       for (size_t j = 1; j < resolution; ++j) {
         double u = (double)j / resolution;
-        curvature[from+j] = curvature[from] * (1 - u) + curvature[to];
+        curvature[from+j] = curvature[from] * (1 - u) + curvature[to] * u;
       }
     }
     std::transform(curvature.begin(), curvature.end(), curvature.begin(), delinearize);
