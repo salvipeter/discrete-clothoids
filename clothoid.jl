@@ -5,7 +5,7 @@ import Graphics
 using LinearAlgebra
 
 # Parameters
-curvature_scaling = 5000
+curvature_scaling = -800#5000
 tangent_length = 80
 
 # GUI parameters
@@ -15,7 +15,9 @@ iterations = 100
 alpha = -1.0
 
 # Global variables
-points = []
+points = map(p -> p + [150, 50], [[100., 100], [115, 227], [28, 300], [99, 341], [203, 264], [308, 304], [307, 219], [190, 171], [171, 59]])
+#points = map(p -> p + [100, 100], [[350.,142],[327,126],[297,120],[246,136],[217,128],[183,91],[96,47],[129,139],[177,199],[88,197],[166,255],[268,231],[319,160],[350,142]])
+#points = map(p -> p + [200, 200], [[24.,85],[112,158],[205,102]])
 curve = []
 curvature_comb = []
 
@@ -316,7 +318,7 @@ function setup_gui()
     hbox = GtkBox(:h)
     push!(vbox, hbox)
     push!(hbox, GtkLabel("Alpha: "))
-    choices = [-1.0, -0.8, -0.5, -0.2, 0.2, 0.5, 0.8, 1.0]
+    choices = [-2.5, -1.0, -0.8, -0.5, -0.2, -0.1]
     radios = [GtkRadioButton(string(choice)) for choice in choices]
     set_gtk_property!(radios[1], :active, true)
     for r in radios
@@ -329,6 +331,7 @@ function setup_gui()
         push!(hbox, r)
     end
 
+    generate_curve()
     showall(win)
 end
 
