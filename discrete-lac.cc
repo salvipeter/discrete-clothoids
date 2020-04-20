@@ -101,6 +101,7 @@ void DiscreteLAC::fit() {
   // Fill the polyline with sampled points
   polyline_.clear();
   polyline_.push_back(input_[0]);
+  input_indices_.clear();
   input_indices_.push_back(0);
   for (size_t i = 1; i < n; ++i) {
     size_t resolution = std::round(distances[i-1] * density);
@@ -190,18 +191,18 @@ void DiscreteLAC::fit() {
 
 Vector2DVector DiscreteLAC::tangents() const {
   Vector2DVector result;
-  Vector2D n;
+  Vector2D t;
   for (auto i : input_indices_) {
     if (i == 0) {
       if (closed_)
-        n = polyline_[1] - polyline_.back();
+        t = polyline_[1] - polyline_.back();
       else
-        n = polyline_[1] - polyline_[0];
+        t = polyline_[1] - polyline_[0];
     } else if (i == polyline_.size() - 1)
-      n = polyline_[i] - polyline_[i-1];
+      t = polyline_[i] - polyline_[i-1];
     else
-      n = polyline_[i+1] - polyline_[i-1];
-    result.push_back(n.normalize());
+      t = polyline_[i+1] - polyline_[i-1];
+    result.push_back(t.normalize());
   }
   return result;
 }
