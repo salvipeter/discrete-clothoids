@@ -13,10 +13,13 @@ closed_curve = false
 subsampling = 25
 iterations = 100
 alpha = -1.0
+precise = false
+precision = 1.0e-5
 
 # Global variables
 points = []
 curve = []
+indices = []
 curvature_comb = []
 
 distance(p, q) = norm(p - q)
@@ -38,25 +41,53 @@ end
 
 """
 Subsamples the given data by `subsampling`, cycling through if the second argument is `true`.
-When the third argument is true, sampling uses alpha exponent instead of linear interpolation.
 """
-function subsample(original, closedp, use_alpha_p = false)
-    if isempty(original)
+function subsample(original, closedp)
+    if length(original) < 2
         return []
     end
-    if use_alpha_p
-        original = map(x -> sign(x)*abs(x)^(-alpha), original)
+
+    # Compute the average distance & sampling density
+    distances = map(norm, original[2:end] - original[1:end-1])
+    if closedp
+        push!(distances, norm(original[1] - original[end]))
     end
+    avg_distance = sum(distances) / length(distances)
+    density = subsampling / avg_distance
+
+    n = length(original)
     result = []
-    for i in 2:length(original)
-        append!(result, linspace_nolast(original[i-1], original[i], subsampling))
+    global indices = [1]
+    for i in 2:n
+        resolution = Int(round(distances[i-1] * density))
+        append!(result, linspace_nolast(original[i-1], original[i], resolution))
+        push!(indices, length(result) + 1)
     end
     if closedp
-        append!(result, linspace_nolast(original[end], original[1], subsampling))
+        resolution = Int(round(distances[end] * density))
+        append!(result, linspace_nolast(original[end], original[1], resolution))
+        push!(indices, length(result) + 1)
     else
         push!(result, original[end])
     end
-    use_alpha_p ? map(x -> sign(x)*abs(x)^(-1/alpha), result) : result
+
+    result
+end
+
+function target_curvature(indices, curvatures, closedp)
+    result = []
+    curvatures = map(x -> sign(x)*abs(x)^(-alpha), curvatures)
+    for i in 2:length(curvatures)
+        resolution = indices[i] - indices[i-1]
+        append!(result, linspace_nolast(curvatures[i-1], curvatures[i], resolution))
+    end
+    if closedp
+        resolution = indices[end] - indices[end-1]
+        append!(result, linspace_nolast(curvatures[end], curvatures[1], resolution))
+    else
+        push!(result, curvatures[end])
+    end
+    map(x -> sign(x)*abs(x)^(-1/alpha), result)
 end
 
 "Updates one point, given its neighbors and the target curvature."
@@ -85,13 +116,15 @@ function generate_curve()
     # Generate initial curve points
     global curve = subsample(points, closed_curve)
 
-    if length(points) < 3
+    n = length(points)
+    if n < 3
         return
     end
 
     # Approximate clothoid curve
     curve_curv = []
-    for it in 1:iterations
+    iter = 0
+    while precise || iter < iterations
         # Generate curvature values at the seed points
         point_curv = []
         if closed_curve
@@ -100,31 +133,42 @@ function generate_curve()
             push!(point_curv, 0.0)
         end
         for i in 2:length(points)-1
-            j = 1 + (i-1) * subsampling
+            j = indices[i]
             push!(point_curv, curvature(curve[j-1], curve[j], curve[j+1]))
         end
         if closed_curve
-            j = 1 + (length(points)-1) * subsampling
+            j = indices[n]
             push!(point_curv, curvature(curve[j-1], curve[j], curve[j+1]))
         else
             push!(point_curv, 0.0)
         end
 
         # Generate target curvature values on the curve
-        curve_curv = subsample(point_curv, closed_curve, true)
+        curve_curv = target_curvature(indices, point_curv, closed_curve)
 
         # Update curve points
         tmp = similar(curve)
-        for i in eachindex(curve)
-            if i % subsampling == 1
-                tmp[i] = curve[i]
-            elseif closed_curve && i == length(curve)
-                tmp[i] = update(curve[end-1], curve[end], curve[1], curve_curv[end])
-            else
-                tmp[i] = update(curve[i-1], curve[i], curve[i+1], curve_curv[i])
+        tmp[1] = curve[1]
+        for i in 2:n
+            tmp[indices[i]] = curve[indices[i]]
+            for j in indices[i-1]+1:indices[i]-1
+                tmp[j] = update(curve[j-1], curve[j], curve[j+1], curve_curv[j])
             end
         end
+        if closed_curve
+            for j in indices[end-1]+1:indices[end]-2
+                tmp[j] = update(curve[j-1], curve[j], curve[j+1], curve_curv[j])
+            end
+            tmp[end] = update(curve[end-1], curve[end], curve[1], curve_curv[end])
+        end
+
+        # Find maximal distance and exit when small
+        change = maximum(norm, curve - tmp)
         curve = tmp
+        if change < precision
+            break
+        end
+        iter += 1
     end
 
     # Generate curvature comb
@@ -204,7 +248,7 @@ draw_callback = @guarded (canvas) -> begin
     Graphics.set_source_rgb(ctx, 1, 0, 1)
     Graphics.set_line_width(ctx, 1.0)
     for i in 2:length(points)-1
-        j = 1 + (i-1) * subsampling
+        j = indices[i]
         dir = curve[j-1] - curve[j+1]
         len = norm(dir)
         if len > 0
@@ -302,7 +346,7 @@ function setup_gui()
     push!(hbox, sss)
 
     # Iterations Spinbutton
-    its = GtkSpinButton(0:20:500)
+    its = GtkSpinButton(0:20:1000)
     set_gtk_property!(its, :value, iterations)
     signal_connect(its, "value-changed") do sb
         global iterations = get_gtk_property(sb, :value, Int)
@@ -328,6 +372,26 @@ function setup_gui()
         end
         push!(hbox, r)
     end
+
+    # Precise Checkbox
+    precisep = GtkCheckButton("Precision:")
+    set_gtk_property!(precisep, :active, precise)
+    signal_connect(precisep, "toggled") do cb
+        global precise = get_gtk_property(cb, :active, Bool)
+        generate_curve()
+        draw(canvas)
+    end
+    push!(hbox, precisep)
+
+    # Precision Spinbutton
+    prs = GtkSpinButton(1:1:10)
+    set_gtk_property!(prs, :value, Int(round(-log10(precision))))
+    signal_connect(prs, "value-changed") do sb
+        global precision = exp10(-get_gtk_property(sb, :value, Int))
+        generate_curve()
+        draw(canvas)
+    end
+    push!(hbox, prs)
 
     generate_curve()
     showall(win)
