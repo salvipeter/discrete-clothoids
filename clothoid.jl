@@ -4,11 +4,16 @@ using Gtk
 import Graphics
 using LinearAlgebra
 
-# Parameters
-curvature_scaling = -2000
-tangent_length = 80
-
 # GUI parameters
+curvature_scaling = -2000
+curvature_sparsity = 10
+tangent_length = 80
+show_tangents = false
+show_endpoints = false
+point_size = 5
+rectangle_scale = 1.4
+
+# GUI variables
 closed_curve = false
 subsampling = 25
 iterations = 100
@@ -185,7 +190,7 @@ function generate_curve()
     if isempty(curve_curv)
         curve_curv = zeros(length(curve))
     end
-    global curvature_comb = normals .* curve_curv * curvature_scaling
+    global curvature_comb = curve .+ normals .* curve_curv * curvature_scaling
 end
 
 
@@ -215,25 +220,27 @@ draw_callback = @guarded (canvas) -> begin
     Graphics.fill(ctx)
 
     # Input polygon
-    Graphics.set_source_rgb(ctx, 1, 0, 0)
-    Graphics.set_line_width(ctx, 1.0)
-    draw_polygon(ctx, points, closed_curve)
+    # Graphics.set_source_rgb(ctx, 1, 0, 0)
+    # Graphics.set_line_width(ctx, 1.0)
+    # draw_polygon(ctx, points, closed_curve)
 
     # Generated curve
-    Graphics.set_source_rgb(ctx, 0, 0, 1)
+    Graphics.set_source_rgb(ctx, 0.8, 0.3, 0)
     Graphics.set_line_width(ctx, 2.0)
     draw_polygon(ctx, curve, closed_curve)
 
     # Approximate curvature comb
     if length(points) > 2
-        Graphics.set_source_rgb(ctx, 0, 1, 0)
+        Graphics.set_source_rgb(ctx, 0, 0, 1)
         Graphics.set_line_width(ctx, 1.0)
-        Graphics.new_path(ctx)
-        for i in eachindex(curve)
+        draw_polygon(ctx, curvature_comb, closed_curve)
+        for i in 1:length(curvature_comb)
+            i % curvature_sparsity != 0 && continue
+            Graphics.new_path(ctx)
             Graphics.move_to(ctx, curve[i][1], curve[i][2])
-            Graphics.rel_line_to(ctx, curvature_comb[i][1], curvature_comb[i][2])
+            Graphics.line_to(ctx, curvature_comb[i][1], curvature_comb[i][2])
+            Graphics.stroke(ctx)
         end
-        Graphics.stroke(ctx)
     end
 
     if subsampling <= 10
@@ -244,34 +251,42 @@ draw_callback = @guarded (canvas) -> begin
         end
     end
 
-    # Approximated tangents (does not account for non-equidistant sampling)
-    Graphics.set_source_rgb(ctx, 1, 0, 1)
-    Graphics.set_line_width(ctx, 1.0)
-    for i in 2:length(points)-1
-        j = indices[i]
-        dir = curve[j-1] - curve[j+1]
-        len = norm(dir)
-        if len > 0
-            dir /= len
+    # Approximated tangents
+    if show_tangents
+        Graphics.set_source_rgb(ctx, 1, 0, 1)
+        Graphics.set_line_width(ctx, 1.0)
+        for i in 2:length(points)-1
+            j = indices[i]
+            dir = curve[j-1] - curve[j+1]
+            len = norm(dir)
+            if len > 0
+                dir /= len
+            end
+            p1 = points[i] - dir * tangent_length / 2
+            p2 = points[i] + dir * tangent_length / 2
+            Graphics.new_path(ctx)
+            Graphics.move_to(ctx, p1[1], p1[2])
+            Graphics.line_to(ctx, p2[1], p2[2])
+            Graphics.stroke(ctx)
         end
-        p1 = points[i] - dir * tangent_length / 2
-        p2 = points[i] + dir * tangent_length / 2
-        Graphics.new_path(ctx)
-        Graphics.move_to(ctx, p1[1], p1[2])
-        Graphics.line_to(ctx, p2[1], p2[2])
-        Graphics.stroke(ctx)
     end
 
     # Input points
-    Graphics.set_source_rgb(ctx, 0, 0, 0)
-    for p in points[2:end-1]
-        Graphics.arc(ctx, p[1], p[2], 5, 0, 2pi)
+    for p in points[1:end]
+        Graphics.set_source_rgb(ctx, 0, 1, 0)
+        Graphics.arc(ctx, p[1], p[2], point_size, 0, 2pi)
         Graphics.fill(ctx)
+        Graphics.set_source_rgb(ctx, 0, 0, 0)
+        rect = [p + [-point_size, -point_size] * rectangle_scale,
+                p + [-point_size,  point_size] * rectangle_scale,
+                p + [ point_size,  point_size] * rectangle_scale,
+                p + [ point_size, -point_size] * rectangle_scale]
+        draw_polygon(ctx, rect, true)
     end
-    if !isempty(points)
+    if show_endpoints && !isempty(points)
         Graphics.set_source_rgb(ctx, 0, 0.8, 0.8)
         for p in (points[1], points[end])
-            Graphics.arc(ctx, p[1], p[2], 5, 0, 2pi)
+            Graphics.arc(ctx, p[1], p[2], point_size, 0, 2pi)
             Graphics.fill(ctx)
         end
     end
@@ -362,7 +377,6 @@ function setup_gui()
     push!(hbox, GtkLabel("Alpha: "))
     choices = [-2.5, -1.0, -0.8, -0.5, -0.2, -0.1]
     radios = [GtkRadioButton(string(choice)) for choice in choices]
-    set_gtk_property!(radios[1], :active, true)
     for r in radios
         set_gtk_property!(r, :group, radios[1])
         signal_connect(r, "toggled") do _
@@ -372,6 +386,7 @@ function setup_gui()
         end
         push!(hbox, r)
     end
+    set_gtk_property!(radios[2], :active, true)
 
     # Precise Checkbox
     precisep = GtkCheckButton("Precision:")
